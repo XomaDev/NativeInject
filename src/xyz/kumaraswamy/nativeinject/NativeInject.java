@@ -4,29 +4,53 @@ import android.os.Build;
 import android.util.Log;
 import com.google.appinventor.components.runtime.Form;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 public class NativeInject {
 
   private static final String TAG = "NativeInject";
 
+  private final Form form;
+
   private final String classPackageName;
 
   public NativeInject(Class<?> extensionComponent) {
     classPackageName = extensionComponent.getPackage().getName();
+    form = Form.getActiveForm();
+  }
+
+  public void beginUnpack(String name) throws IOException {
+    // first before opening the 7zip file, we have to copy it to the
+    // files directory, then open it
+    InputStream input = form.getAssets().open(classPackageName + '/' + name);
+    File sevenZFile = copyStreamFilesDirectory(name, input);
+    input.close();
+
+    ZipInputStream zFile = null;
+    try {
+      zFile = new ZipInputStream(new FileInputStream(sevenZFile));
+
+      ZipEntry entry;
+      while ((entry = zFile.getNextEntry()) != null) {
+        // iterate over all the enteries in the 7zip file and copy
+        // them over to the application's files directory
+        copyStreamFilesDirectory(entry.getName(), zFile);
+      }
+    } finally {
+      if (zFile != null) {
+        zFile.close();
+      }
+    }
   }
 
   public boolean loadAll() throws IOException {
     String[] archsSupported = Build.SUPPORTED_ABIS;
 
-    Form form = Form.getActiveForm();
-    String[] extAssets = form.getAssets().list(classPackageName);
+    String[] extAssets = form.getFilesDir().list();
 
     List<String> loadedLibs = new ArrayList<>();
 
@@ -42,17 +66,19 @@ public class NativeInject {
         continue;
       }
       String archName = nameSplit[0], libName = nameSplit[1];
+      // the native library is already loaded, this one is another
+      // arch version of the same library
       if (loadedLibs.contains(libName))
-        // the native library is already loaded, this one is another
-        // arch version of the same libary
         continue;
       for (String arch: archsSupported) {
         // try to find the matching architecture of the
         // native library
-        if (!arch.equals(archName)) continue;
+        if (!arch.equals(archName))
+          continue;
         Log.d(TAG, "Loading Native " + libName + " arch = " + arch);
 
-        String filePath = copyFilesDirectory(libName, asset);
+        // the files were already extracted to the files directory
+        String filePath = new File(form.getFilesDir(), asset).getAbsolutePath();
         System.load(filePath);
 
         loadedLibs.add(libName);
@@ -61,26 +87,23 @@ public class NativeInject {
       Log.d(TAG, "Failed to find supporting arch for " + asset);
       return false;
     }
-    return true;
+    Log.d(TAG, "Native Loading Successful");
     // TODO:
-    //  next time loadAll() is called, we first must check if
-    //  it's already loaded in order to reduce execution time
+    //  we gotta optimize the code later to avoid
+    //  multiple repetitions
+    return true;
   }
 
-  private String copyFilesDirectory(String libName, String asset) throws IOException {
-    Form form = Form.getActiveForm();
 
-    File nativeFile = new File(form.getFilesDir(), libName);
-
-    InputStream input = form.getAssets().open(classPackageName + '/' + asset);
-    OutputStream output = new FileOutputStream(nativeFile);
+  private File copyStreamFilesDirectory(String fileName, InputStream input) throws IOException {
+    File file = new File(form.getFilesDir(), fileName);
+    FileOutputStream output = new FileOutputStream(file);
 
     copy(input, output);
 
-    input.close();
     output.close();
 
-    return nativeFile.getAbsolutePath();
+    return file;
   }
 
   private long copy(InputStream source, OutputStream sink)

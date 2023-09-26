@@ -10,5 +10,7 @@
     <orderEntry type="library" name="dev-deps" level="project" />
     <orderEntry type="library" name="rush" level="project" />
     <orderEntry type="library" name="androidx" level="project" />
+    <orderEntry type="library" name="common-compress" level="project" />
+    <orderEntry type="library" name="xz-1.9" level="project" />
   </component>
 </module>
