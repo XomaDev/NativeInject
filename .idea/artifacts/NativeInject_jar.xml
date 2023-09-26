@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="NativeInject:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/NativeInject_jar</output-path>
+    <root id="archive" name="NativeInject.jar">
+      <element id="module-output" name="NativeInject" />
+    </root>
+  </artifact>
+</component>
